@@ -1,0 +1,40 @@
+{
+  "name": "nlsh",
+  "version": "0.1.0",
+  "description": "Natural Language Shell Agent — speak intent, get goals done",
+  "type": "module",
+  "bin": {
+    "nlsh": "./dist/index.js"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "test": "npm run test:unit",
+    "test:unit": "tsx test/unit/planner.test.ts && tsx test/unit/planner-extras.test.ts && tsx test/unit/executor.test.ts && tsx test/unit/memory.test.ts && tsx test/unit/recovery.test.ts && tsx test/unit/ui-controller.test.ts && tsx test/unit/agent-flow.test.ts && tsx test/unit/editor.test.ts",
+    "test:integration": "tsx test/integration/agent.test.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "execa": "^8.0.1",
+    "ink": "^4.4.1",
+    "js-yaml": "^4.1.1",
+    "react": "^18.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.9.1",
+    "@types/react": "^18.3.29",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

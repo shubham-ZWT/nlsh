@@ -1,0 +1,141 @@
+#!/usr/bin/env node
+
+import { getConfig, setupWizard } from './config.js';
+import { collectContext } from './utils/platform.js';
+import { runAgent } from './agent/index.js';
+import { loadProfile, saveProfile } from './terrain/profile.js';
+import { scanProject } from './terrain/scanner.js';
+import { ensureTerrain } from './terrain/index.js';
+import type { TerrainProfile } from './terrain/index.js';
+import { TuiController } from './ui/index.js';
+import { startTUI } from './ui/tui.js';
+
+async function showTerrain() {
+  const cwd = process.cwd();
+  const profile = loadProfile(cwd);
+  if (!profile) {
+    console.log('  No terrain profile found. Run an intent first to scan the project.');
+    return;
+  }
+  console.log('');
+  console.log('  Terrain Profile');
+  console.log('  ───────────────');
+  if (profile.projectName) console.log(`  Project: ${profile.projectName}`);
+  if (profile.stack?.length) console.log(`  Stack: ${profile.stack.join(', ')}`);
+  if (profile.packageManager) console.log(`  Package manager: ${profile.packageManager}`);
+  if (profile.scripts && Object.keys(profile.scripts).length > 0) {
+    console.log(`  Scripts: ${Object.keys(profile.scripts).join(', ')}`);
+  }
+  if (profile.services?.length) {
+    console.log(`  Services: ${profile.services.map((s) => s.name).join(', ')}`);
+    for (const svc of profile.services) {
+      if (svc.ports) console.log(`    ${svc.name} ports: ${svc.ports.join(', ')}`);
+    }
+  }
+  if (profile.requiredEnvVars?.length) console.log(`  Required env vars: ${profile.requiredEnvVars.join(', ')}`);
+  if (profile.commitStyle) console.log(`  Commit style: ${profile.commitStyle}`);
+  if (profile.currentBranch) console.log(`  Branch: ${profile.currentBranch}`);
+  if (profile.dockerBaseImage) console.log(`  Base image: ${profile.dockerBaseImage}`);
+  if (profile.dockerExposedPorts?.length) console.log(`  Exposed ports: ${profile.dockerExposedPorts.join(', ')}`);
+  if (profile.makeTargets?.length) console.log(`  Make targets: ${profile.makeTargets.join(', ')}`);
+  console.log(`  Scanned: ${profile.scannedAt}`);
+  console.log('');
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+    console.log('');
+    console.log('  nlsh — Natural Language Shell Agent');
+    console.log('');
+    console.log('  Usage:');
+    console.log('    nlsh "your intent"    Run the agent');
+    console.log('    nlsh setup            Configure API keys');
+    console.log('    nlsh terrain           Show terrain profile');
+    console.log('    nlsh terrain --refresh Force rescan terrain');
+    console.log('    nlsh terrain --clear   Delete terrain profile');
+    console.log('    nlsh --help            Show this help');
+    console.log('');
+    return;
+  }
+
+  if (args[0] === 'setup') {
+    await setupWizard();
+    return;
+  }
+
+  if (args[0] === 'terrain') {
+    const cwd = process.cwd();
+    if (args[1] === '--refresh') {
+      console.log('  ◆ Rescanning terrain...');
+      const profile = scanProject(cwd);
+      saveProfile(cwd, profile);
+      console.log('  ✓ Terrain refreshed');
+      return;
+    }
+    if (args[1] === '--clear') {
+      const { existsSync, rmSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      const dir = join(cwd, '.nlsh');
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+        console.log('  ✓ Terrain cleared');
+      } else {
+        console.log('  No terrain to clear.');
+      }
+      return;
+    }
+    await showTerrain();
+    return;
+  }
+
+  const intent = args.join(' ');
+  const config = getConfig();
+
+  if (!config.apiKey) {
+    console.log('  No API key configured. Run `nlsh setup` first.');
+    return;
+  }
+
+  const context = collectContext();
+
+  // Terrain scan (runs before TUI so its output appears above Ink)
+  let terrain: TerrainProfile | null = null;
+  try {
+    terrain = await ensureTerrain(context.cwd);
+  } catch {
+    // terrain is optional
+  }
+
+  // Start TUI
+  const controller = new TuiController(intent);
+  if (terrain) {
+    const details: string[] = [];
+    if (terrain.stack?.length) details.push(`${terrain.stack.join(', ')}`);
+    if (terrain.services?.length) details.push(`${terrain.services.length} service(s)`);
+    if (terrain.requiredEnvVars?.length) details.push(`${terrain.requiredEnvVars.length} env var(s)`);
+    controller.update({ terrainDetails: details });
+  }
+  const tui = startTUI(controller);
+
+  // Run agent
+  const task = await runAgent(intent, context, config, controller, terrain ?? undefined);
+
+  // Properly unmount Ink to avoid libuv assertion on Windows
+  tui.unmount();
+  await tui.waitUntilExit().catch(() => {});
+
+  // Print final status line to normal console
+  if (task.status === 'done') {
+    console.log('  ✓ Done');
+  } else if (task.status === 'failed') {
+    console.log('  ✗ Failed after', task.history.length || controller.state.steps.length, 'step(s)');
+    process.exit(1);
+  }
+}
+
+main().catch((err: Error) => {
+  console.error('  ✗ Fatal error:', err.message);
+  process.exit(1);
+});
