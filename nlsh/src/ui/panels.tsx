@@ -280,21 +280,43 @@ export function DonePanel({ state }: { state: TuiState }) {
       )}
       <Box flexDirection="column" marginTop={1}>
         {state.steps.map((s) => (
-          <Box key={s.id}>
-            <Text
-              color={
-                s.status === 'completed'
-                  ? 'greenBright'
-                  : s.status === 'failed'
-                    ? 'redBright'
-                    : 'yellow'
-              }
-            >
-              {s.status === 'completed' ? '\u2713' : s.status === 'failed' ? '\u2717' : '\u25CB'}
-            </Text>
-            <Text> {s.intent}</Text>
-            {s.status === 'failed' && state.diagnosis && (
-              <Text dimColor> — {state.diagnosis}</Text>
+          <Box key={s.id} flexDirection="column">
+            <Box>
+              <Text
+                color={
+                  s.status === 'completed'
+                    ? 'greenBright'
+                    : s.status === 'failed'
+                      ? 'redBright'
+                      : 'yellow'
+                }
+              >
+                {s.status === 'completed' ? '\u2713' : s.status === 'failed' ? '\u2717' : '\u25CB'}
+              </Text>
+              <Text> {s.intent}</Text>
+              {s.status === 'failed' && state.diagnosis && (
+                <Text dimColor> — {state.diagnosis}</Text>
+              )}
+            </Box>
+            {s.command && (
+              <Box marginLeft={3} marginTop={0}>
+                <Text dimColor>$ </Text>
+                <Text dimColor>{s.command}</Text>
+              </Box>
+            )}
+            {s.output && (
+              <Box
+                flexDirection="column"
+                marginLeft={3}
+                borderStyle="single"
+                borderColor="gray"
+                paddingX={1}
+                marginTop={0}
+              >
+                {s.output.split('\n').filter(Boolean).map((line, i) => (
+                  <Text key={i} wrap="truncate">{line}</Text>
+                ))}
+              </Box>
             )}
           </Box>
         ))}

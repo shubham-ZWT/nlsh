@@ -1,5 +1,4 @@
 import { callGroq } from './groq.js';
-import { callGemini } from './gemini.js';
 import type { NlshConfig } from '../config.js';
 
 interface RouterMessage {
@@ -12,11 +11,5 @@ export async function callLLM(
   systemPrompt: string | undefined,
   config: NlshConfig
 ): Promise<string> {
-  switch (config.provider) {
-    case 'gemini':
-      return callGemini(messages, systemPrompt, config);
-    case 'groq':
-    default:
-      return callGroq(messages, systemPrompt, config);
-  }
+  return callGroq(messages, systemPrompt, config);
 }

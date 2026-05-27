@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nlsh</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #090a0f; overflow: hidden; }
+  body { display: flex; flex-direction: column; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace; }
+
+  #header {
+    display: flex; align-items: center;
+    padding: 6px 16px;
+    background: #0d1117;
+    border-bottom: 1px solid #1e2430;
+    flex-shrink: 0;
+    user-select: none;
+    gap: 10px;
+  }
+  #brand { font-size: 14px; font-weight: 700; color: #39c5cf; letter-spacing: -0.02em; }
+  #status { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6e7681; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  #dot { width: 6px; height: 6px; border-radius: 50%; background: #484f58; }
+  #dot.online { background: #3fb950; }
+  #dot.busy { background: #d29922; }
+
+  #terminal-container { flex: 1; position: relative; }
+  #terminal-container .xterm { height: 100%; padding: 4px; }
+  #terminal-container .xterm-viewport { scrollbar-width: thin; scrollbar-color: #1e2430 transparent; }
+  #terminal-container .xterm-viewport::-webkit-scrollbar { width: 5px; }
+  #terminal-container .xterm-viewport::-webkit-scrollbar-thumb { background: #1e2430; border-radius: 3px; }
+  #terminal-container .xterm-cursor-layer { display: none; }
+</style>
+</head>
+<body>
+  <div id="header">
+    <span id="brand">nlsh</span>
+    <span id="status"><span id="dot"></span><span id="status-text">disconnected</span></span>
+  </div>
+  <div id="terminal-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script>
+    const term = new Terminal({
+      cursorBlink: false,
+      cursorStyle: 'bar',
+      cursorWidth: 1,
+      fontSize: 14,
+      fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace",
+      lineHeight: 1.5,
+      theme: {
+        background: '#090a0f',
+        foreground: '#e6edf3',
+        cursor: '#e6edf3',
+        selectionBackground: '#3b5998',
+        black: '#0d1117', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
+        blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#e6edf3',
+        brightBlack: '#484f58', brightRed: '#ffa198', brightGreen: '#56d364',
+        brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
+      },
+    });
+
+    const container = document.getElementById('terminal-container');
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(container);
+    fitAddon.fit();
+
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('status-text');
+
+    function setStatus(state, text) {
+      dot.className = state;
+      statusText.textContent = text;
+    }
+
+    let ws = null;
+    let inputBuffer = '';
+    let awaitingInput = false;
+    let intentBuffer = '';
+    let active = false;
+
+    function write(data) {
+      term.write(data);
+    }
+
+    function writeLine(text, color) {
+      if (color) write('\r\n\x1b[' + color + 'm' + text + '\x1b[0m');
+      else write('\r\n' + text);
+    }
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+      setStatus('busy', 'connecting...');
+
+    ws.onopen = () => {
+        setStatus('online', 'connected');
+        active = true;
+        welcome();
+    };
+
+    ws.onclose = () => {
+        setStatus('', 'disconnected');
+        active = false;
+        awaitingInput = false;
+        inputBuffer = '';
+        setTimeout(connect, 2000);
+    };
+
+    ws.onerror = () => {};
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      switch (msg.type) {
+        case 'output':
+          write(msg.data);
+          break;
+        case 'input':
+          awaitingInput = true;
+          write('\r\n  ' + msg.prompt + ' ');
+          break;
+        case 'done':
+          if (msg.failed) {
+            write('\r\n\r\n  \x1b[31m\u2717\x1b[0m ' + (msg.message || 'Failed') + '\r\n\n');
+          } else {
+            write('\r\n  \x1b[32m\u2713\x1b[0m\x1b[2m Done\x1b[0m\r\n\n');
+          }
+          write('  \x1b[36m>\x1b[0m ');
+          awaitingInput = false;
+          break;
+        case 'error':
+          write('\r\n  \x1b[31m\u2717\x1b[0m ' + msg.message + '\r\n\n');
+          write('  \x1b[36m>\x1b[0m ');
+          awaitingInput = false;
+          break;
+      }
+    };
+}
+
+// ...
+
+term.onData((data) => {
+      if (!active) return;
+
+      if (awaitingInput) {
+        // Y/n/e input mode — single keypress
+        const key = data.toLowerCase().trim();
+        if (key === 'y' || key === 'n' || key === 'e') {
+          write(key + '\r\n');
+          ws.send(JSON.stringify({ type: 'input', data: key }));
+          awaitingInput = false;
+        }
+        return;
+      }
+
+      // Intent input mode — buffer until Enter
+      if (data === '\r') {
+        const intent = intentBuffer.trim();
+        intentBuffer = '';
+        if (intent) {
+          write('\r\n');
+          ws.send(JSON.stringify({ type: 'intent', data: intent }));
+        } else {
+          write('\r\n  \x1b[36m>\x1b[0m ');
+        }
+        return;
+      }
+
+      if (data === '\x7f') { // Backspace
+        if (intentBuffer.length > 0) {
+          intentBuffer = intentBuffer.slice(0, -1);
+          write('\b \b');
+        }
+        return;
+      }
+
+      // Ignore control characters
+      if (data.charCodeAt(0) < 32 && data !== '\t') return;
+
+      intentBuffer += data;
+      write(data);
+    });
+
+    window.addEventListener('resize', () => fitAddon.fit());
+    connect();
+  </script>
+</body>
+</html>

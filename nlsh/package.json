@@ -1,17 +1,19 @@
 {
-  "name": "nlsh",
-  "version": "0.1.0",
+  "name": "@shubham.dev/nlsh",
+  "version": "0.1.4",
   "description": "Natural Language Shell Agent — speak intent, get goals done",
   "type": "module",
   "bin": {
-    "nlsh": "./dist/index.js"
+    "nlsh": "dist/index.js"
   },
+  "preferGlobal": true,
   "scripts": {
     "start": "tsx src/index.ts",
     "dry": "tsx src/index.ts --dry-run",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
+    "prepack": "npm run build",
     "test": "npm run test:unit",
     "test:unit": "tsx test/unit/planner.test.ts && tsx test/unit/planner-extras.test.ts && tsx test/unit/executor.test.ts && tsx test/unit/memory.test.ts && tsx test/unit/recovery.test.ts && tsx test/unit/ui-controller.test.ts && tsx test/unit/agent-flow.test.ts && tsx test/unit/editor.test.ts && tsx test/unit/safety.test.ts && tsx test/unit/history.test.ts && tsx test/unit/committer.test.ts",
     "test:integration": "tsx test/integration/agent.test.ts"
@@ -20,7 +22,6 @@
     "dist"
   ],
   "dependencies": {
-    "chalk": "^5.3.0",
     "execa": "^8.0.1",
     "ink": "^4.4.1",
     "js-yaml": "^4.1.1",
@@ -37,5 +38,18 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "keywords": [
+    "shell",
+    "cli",
+    "agent",
+    "ai",
+    "natural-language",
+    "terminal"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nlsh/nlsh.git"
   }
 }

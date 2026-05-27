@@ -99,11 +99,13 @@ async function main() {
     return;
   }
 
-  // Parse dry-run flag (handle --dry-run anywhere in args)
+  // Parse flags
   const dryRunEnv = process.env.NLSH_DRY_RUN === '1';
   const dryRunIndex = args.indexOf('--dry-run');
   if (dryRunIndex !== -1) args.splice(dryRunIndex, 1);
   const dryRun = dryRunEnv || dryRunIndex !== -1;
+  const headless = args.includes('--headless');
+  if (headless) args.splice(args.indexOf('--headless'), 1);
   const intent = args.join(' ');
 
   const config = getConfig();
@@ -115,7 +117,7 @@ async function main() {
 
   const context = collectContext();
 
-  // Terrain scan (runs before TUI so its output appears above Ink)
+  // Terrain scan
   let terrain: TerrainProfile | null = null;
   try {
     terrain = await ensureTerrain(context.cwd);
@@ -123,25 +125,44 @@ async function main() {
     // terrain is optional
   }
 
-  // Start TUI
-  const controller = new TuiController(intent, dryRun);
-  if (terrain) {
-    const details: string[] = [];
-    if (terrain.stack?.length) details.push(`${terrain.stack.join(', ')}`);
-    if (terrain.services?.length) details.push(`${terrain.services.length} service(s)`);
-    if (terrain.requiredEnvVars?.length) details.push(`${terrain.requiredEnvVars.length} env var(s)`);
-    controller.update({ terrainDetails: details });
-  }
-  const tui = startTUI(controller);
+  // Check if we can use Ink TUI (needs a real TTY)
+  const hasTTY = !!process.stdin.isTTY && !!process.stdout.isTTY;
 
-  // Run agent
+  if (headless || !hasTTY) {
+    // Fallback to simple console mode
+    const { runHeadless } = await import('./headless.js');
+    const task = await runHeadless(intent, context, config, terrain ?? undefined);
+    if (task.status === 'done') {
+      console.log('  ✓ Done');
+    } else {
+      console.log('  ✗ Failed');
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Start TUI (Ink)
+  let tui: ReturnType<typeof startTUI>;
+  const controller = new TuiController(intent, dryRun);
+  try {
+    if (terrain) {
+      const details: string[] = [];
+      if (terrain.stack?.length) details.push(`${terrain.stack.join(', ')}`);
+      if (terrain.services?.length) details.push(`${terrain.services.length} service(s)`);
+      if (terrain.requiredEnvVars?.length) details.push(`${terrain.requiredEnvVars.length} env var(s)`);
+      controller.update({ terrainDetails: details });
+    }
+    tui = startTUI(controller);
+  } catch (err) {
+    console.error(`\n  nlsh needs a real terminal to run. Use a standard terminal emulator.\n`);
+    process.exit(1);
+  }
+
   const task = await runAgent(intent, context, config, controller, terrain ?? undefined);
 
-  // Properly unmount Ink to avoid libuv assertion on Windows
   tui.unmount();
   await tui.waitUntilExit().catch(() => {});
 
-  // Print final status line to normal console
   if (task.status === 'done') {
     console.log('  ✓ Done');
   } else if (task.status === 'failed') {

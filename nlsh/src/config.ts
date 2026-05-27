@@ -3,31 +3,17 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-export type Provider = 'groq' | 'gemini';
-
 export interface NlshConfig {
-  provider: Provider;
-  model: string;
   apiKey: string;
+  model?: string;
 }
-
-const PROVIDER_ENV_VARS: Record<Provider, string> = {
-  groq: 'GROQ_API_KEY',
-  gemini: 'GEMINI_API_KEY',
-};
-
-const DEFAULT_MODELS: Record<Provider, string> = {
-  groq: 'llama-3.3-70b-versatile',
-  gemini: 'gemini-2.0-flash',
-};
 
 const CONFIG_DIR = join(homedir(), '.nlsh');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 
 const DEFAULT_CONFIG: NlshConfig = {
-  provider: 'groq',
-  model: 'llama-3.3-70b-versatile',
   apiKey: '',
+  model: 'llama-3.3-70b-versatile',
 };
 
 function readLine(query: string): Promise<string> {
@@ -41,26 +27,19 @@ function readLine(query: string): Promise<string> {
 }
 
 export function getConfig(): NlshConfig {
+  const envKey = process.env.GROQ_API_KEY || '';
   if (!existsSync(CONFIG_PATH)) {
-    const provider: Provider = 'groq';
-    const envKey = process.env[PROVIDER_ENV_VARS[provider]] || '';
-    return { provider, model: DEFAULT_MODELS[provider], apiKey: envKey };
+    return { ...DEFAULT_CONFIG, apiKey: envKey };
   }
   try {
     const raw = readFileSync(CONFIG_PATH, 'utf-8');
     const saved = JSON.parse(raw) as Partial<NlshConfig>;
-    const provider: Provider = saved.provider === 'gemini' ? 'gemini' : 'groq';
-    const envVar = PROVIDER_ENV_VARS[provider];
-    const envKey = process.env[envVar] || '';
     return {
-      provider,
-      model: saved.model || DEFAULT_MODELS[provider],
       apiKey: envKey || saved.apiKey || '',
+      model: saved.model || DEFAULT_CONFIG.model,
     };
   } catch {
-    const provider: Provider = 'groq';
-    const envKey = process.env[PROVIDER_ENV_VARS[provider]] || '';
-    return { provider, model: DEFAULT_MODELS[provider], apiKey: envKey };
+    return { ...DEFAULT_CONFIG, apiKey: envKey };
   }
 }
 
@@ -73,17 +52,15 @@ export async function setupWizard(): Promise<NlshConfig> {
   console.log('  nlsh setup');
   console.log('  ───────────');
   console.log('');
+  console.log('  Using Groq (llama-3.3-70b-versatile)');
+  console.log('  Get a free API key at https://console.groq.com');
+  console.log('');
 
-  const providerRaw = await readLine('  Provider (groq/gemini) [groq]: ');
-  const provider: Provider = providerRaw === 'gemini' ? 'gemini' : 'groq';
-  const defaultModel = DEFAULT_MODELS[provider];
-  const model = await readLine(`  Model [${defaultModel}]: `);
   const apiKey = await readLine('  API key: ');
 
   const config: NlshConfig = {
-    provider,
-    model: model || defaultModel,
     apiKey: apiKey || '',
+    model: 'llama-3.3-70b-versatile',
   };
 
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');

@@ -1,8 +1,4 @@
-export interface GroqOptions {
-  apiKey: string;
-  model?: string;
-  signal?: AbortSignal;
-}
+import type { NlshConfig } from '../config.js';
 
 const BASE_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -22,7 +18,7 @@ interface GroqResponse {
 export async function callGroq(
   messages: GroqMessage[],
   systemPrompt: string | undefined,
-  { apiKey, model, signal }: GroqOptions
+  { apiKey, model }: NlshConfig
 ): Promise<string> {
   if (!apiKey) {
     throw new Error('GROQ_API_KEY not configured. Run `nlsh setup` first.');
@@ -45,7 +41,6 @@ export async function callGroq(
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
-    signal,
   });
 
   if (!response.ok) {

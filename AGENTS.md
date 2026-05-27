@@ -48,8 +48,7 @@ nlsh/
       index.ts        ← ensureTerrain init flow
     llm/
       groq.ts         ← fetch() wrapper around Groq API
-      gemini.ts       ← fetch() wrapper around Gemini API (optional)
-      router.ts       ← picks model by provider config
+      router.ts       ← routes to Groq
     ui/
       index.ts        ← TuiController class, TuiState type
       tui.tsx         ← Ink App component + render function
