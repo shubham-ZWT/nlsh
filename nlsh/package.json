@@ -1,6 +1,6 @@
 {
   "name": "@shubham.dev/nlsh",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "Natural Language Shell Agent — speak intent, get goals done",
   "type": "module",
   "bin": {
@@ -22,6 +22,7 @@
     "dist"
   ],
   "dependencies": {
+    "@shubham.dev/nlsh": "^0.1.8",
     "execa": "^8.0.1",
     "ink": "^4.4.1",
     "js-yaml": "^4.1.1",

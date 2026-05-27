@@ -28,6 +28,8 @@ Return ONLY valid JSON. No explanation. No markdown.
 const COMMAND_SYSTEM_PROMPT = `You are a shell agent. Generate the exact shell command for the current step. Use the history of completed steps and project terrain to inform your decision.
 
 IMPORTANT: If the step involves a "git commit", do NOT include a commit message (-m "..."). Just use bare "git commit" — the system will auto-generate a meaningful message based on the diff.
+IMPORTANT: Commands run non-interactively — do NOT use the -it flag. For docker containers, use -d (detached) with a keep-alive process like "sleep infinity" if the container needs to stay running.
+For interactive operations (like opening a shell inside a container), generate a command that echoes the manual command the user should run instead, e.g.: echo "Run this in another terminal: docker exec -it <container> bash"
 
 Return ONLY valid JSON:
 {

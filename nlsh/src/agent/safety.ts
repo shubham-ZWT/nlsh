@@ -7,6 +7,16 @@ const BLOCKLIST_PATTERNS = [
   { pattern: /^:\(\)\s*\{/, reason: 'Fork bomb' },
   { pattern: /^>\s*\/dev\/(sda|sdb|sdc|nvme|hda)/, reason: 'Raw disk write' },
   { pattern: /^\s*>\s*\/dev\/null\s*&\s*$/, reason: 'Fork bomb variant' },
+  { pattern: /^rmdir\s+\/s/, reason: 'Recursive directory deletion' },
+  { pattern: /^del\s+\/f\s+\/s/, reason: 'Recursive file deletion' },
+  { pattern: /^Remove-Item\s+-Recurse/, reason: 'Recursive deletion' },
+];
+
+const DESTRUCTIVE_DELETE_PATTERNS = [
+  /^rm\s+-rf/,
+  /^rmdir\s+\/s/,
+  /^del\s+\/f\s+\/s/,
+  /^Remove-Item\s+-Recurse/,
 ];
 
 export interface SafetyCheck {
@@ -42,6 +52,14 @@ export function checkSafety(
   // Risk check
   if (risk === 'high') {
     result.fullYesRequired = true;
+  }
+
+  // Override: destructive recursive delete patterns should always be high risk
+  if (DESTRUCTIVE_DELETE_PATTERNS.some((p) => p.test(trimmed))) {
+    if (risk !== 'high') {
+      result.fullYesRequired = true;
+      result.warnings.push('Destructive delete operation — overridden to high risk');
+    }
   }
 
   // Irreversible check

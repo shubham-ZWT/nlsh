@@ -106,6 +106,19 @@ test('safety: multiple warnings accumulate', () => {
   assert.ok(r.warnings.length >= 2);
 });
 
+test('safety: blocks rmdir /s on Windows', () => {
+  const r = checkSafety('rmdir /s /q node_modules', 'low', true, 0.9);
+  assert.equal(r.blocked, true);
+  assert.ok(r.blockReason);
+});
+
+test('safety: overrides low risk for destructive delete', () => {
+  const r = checkSafety('rm -rf node_modules', 'low', true, 0.9);
+  assert.equal(r.blocked, false);
+  assert.equal(r.fullYesRequired, true);
+  assert.ok(r.warnings.some(w => w.includes('overridden')));
+});
+
 // --- Summary ---
 console.log(`\n  safety.test.ts — ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

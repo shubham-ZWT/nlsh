@@ -19,7 +19,7 @@ export async function executeCommand(
   command: string,
   options: ExecOptions = {}
 ): Promise<ExecResult> {
-  const { timeout = 30000, onData } = options;
+  const { timeout = 0, onData } = options;
 
   try {
     const subprocess = execa(command, {
