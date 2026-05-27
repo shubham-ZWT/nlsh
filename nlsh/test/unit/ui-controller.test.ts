@@ -36,7 +36,20 @@ test('constructor: sets initial state to planning', () => {
   assert.deepEqual(ctrl.state.plan, []);
   assert.deepEqual(ctrl.state.steps, []);
   assert.deepEqual(ctrl.state.terrainDetails, []);
+  assert.deepEqual(ctrl.state.safetyWarnings, []);
+  assert.equal(ctrl.state.fullYesRequired, false);
+  assert.equal(ctrl.state.dryRun, false);
   assert.equal(ctrl.state.currentStepIndex, 0);
+});
+
+test('constructor: dryRun flag is reflected in state', () => {
+  const ctrl = new TuiController('test', true);
+  assert.equal(ctrl.state.dryRun, true);
+});
+
+test('constructor: dryRun defaults to false', () => {
+  const ctrl = new TuiController('test');
+  assert.equal(ctrl.state.dryRun, false);
 });
 
 // --- update ---
@@ -198,6 +211,54 @@ test('handleInput: can handle multiple sequential inputs', () => {
   ctrl.waitForInput().then(r => results.push(r));
   ctrl.handleInput('n');
   // Promise callbacks are microtasks, wait for them
+});
+
+// --- Full-yes input buffer ---
+testAsync('handleInput: fullYesRequired buffers "yes" characters and resolves on match', async () => {
+  const ctrl = new TuiController('test');
+  ctrl.update({ fullYesRequired: true });
+  const promise = ctrl.waitForInput();
+  ctrl.handleInput('y');
+  ctrl.handleInput('e');
+  ctrl.handleInput('s');
+  const result = await promise;
+  assert.equal(result, 'y');
+});
+
+testAsync('handleInput: fullYesRequired "n" aborts immediately', async () => {
+  const ctrl = new TuiController('test');
+  ctrl.update({ fullYesRequired: true });
+  const promise = ctrl.waitForInput();
+  ctrl.handleInput('n');
+  const result = await promise;
+  assert.equal(result, 'n');
+});
+
+testAsync('handleInput: fullYesRequired wrong char resets buffer', async () => {
+  const ctrl = new TuiController('test');
+  ctrl.update({ fullYesRequired: true });
+  const promise = ctrl.waitForInput();
+  ctrl.handleInput('y');
+  ctrl.handleInput('x'); // wrong char, resets buffer
+  ctrl.handleInput('y');
+  ctrl.handleInput('e');
+  ctrl.handleInput('s');
+  const result = await promise;
+  assert.equal(result, 'y');
+});
+
+testAsync('handleInput: fullYesRequired requires exact "yes" sequence, partial match fails', async () => {
+  const ctrl = new TuiController('test');
+  ctrl.update({ fullYesRequired: true });
+  const promise = ctrl.waitForInput();
+  ctrl.handleInput('y');
+  ctrl.handleInput('e');
+  ctrl.handleInput('a'); // wrong third char
+  ctrl.handleInput('y');
+  ctrl.handleInput('e');
+  ctrl.handleInput('s');
+  const result = await promise;
+  assert.equal(result, 'y');
 });
 
 // --- State transitions ---

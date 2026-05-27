@@ -8,11 +8,12 @@
   },
   "scripts": {
     "start": "tsx src/index.ts",
+    "dry": "tsx src/index.ts --dry-run",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "test": "npm run test:unit",
-    "test:unit": "tsx test/unit/planner.test.ts && tsx test/unit/planner-extras.test.ts && tsx test/unit/executor.test.ts && tsx test/unit/memory.test.ts && tsx test/unit/recovery.test.ts && tsx test/unit/ui-controller.test.ts && tsx test/unit/agent-flow.test.ts && tsx test/unit/editor.test.ts",
+    "test:unit": "tsx test/unit/planner.test.ts && tsx test/unit/planner-extras.test.ts && tsx test/unit/executor.test.ts && tsx test/unit/memory.test.ts && tsx test/unit/recovery.test.ts && tsx test/unit/ui-controller.test.ts && tsx test/unit/agent-flow.test.ts && tsx test/unit/editor.test.ts && tsx test/unit/safety.test.ts && tsx test/unit/history.test.ts && tsx test/unit/committer.test.ts",
     "test:integration": "tsx test/integration/agent.test.ts"
   },
   "files": [

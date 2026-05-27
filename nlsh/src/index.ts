@@ -9,6 +9,7 @@ import { ensureTerrain } from './terrain/index.js';
 import type { TerrainProfile } from './terrain/index.js';
 import { TuiController } from './ui/index.js';
 import { startTUI } from './ui/tui.js';
+import { printHistory } from './history/index.js';
 
 async function showTerrain() {
   const cwd = process.cwd();
@@ -51,7 +52,10 @@ async function main() {
     console.log('');
     console.log('  Usage:');
     console.log('    nlsh "your intent"    Run the agent');
+    console.log('    nlsh --dry-run "..."  Dry run (show commands, no execution)');
+  console.log('    npm run dry "..."     Same as above via npm');
     console.log('    nlsh setup            Configure API keys');
+    console.log('    nlsh history          Show command history');
     console.log('    nlsh terrain           Show terrain profile');
     console.log('    nlsh terrain --refresh Force rescan terrain');
     console.log('    nlsh terrain --clear   Delete terrain profile');
@@ -62,6 +66,11 @@ async function main() {
 
   if (args[0] === 'setup') {
     await setupWizard();
+    return;
+  }
+
+  if (args[0] === 'history') {
+    printHistory();
     return;
   }
 
@@ -90,7 +99,13 @@ async function main() {
     return;
   }
 
+  // Parse dry-run flag (handle --dry-run anywhere in args)
+  const dryRunEnv = process.env.NLSH_DRY_RUN === '1';
+  const dryRunIndex = args.indexOf('--dry-run');
+  if (dryRunIndex !== -1) args.splice(dryRunIndex, 1);
+  const dryRun = dryRunEnv || dryRunIndex !== -1;
   const intent = args.join(' ');
+
   const config = getConfig();
 
   if (!config.apiKey) {
@@ -109,7 +124,7 @@ async function main() {
   }
 
   // Start TUI
-  const controller = new TuiController(intent);
+  const controller = new TuiController(intent, dryRun);
   if (terrain) {
     const details: string[] = [];
     if (terrain.stack?.length) details.push(`${terrain.stack.join(', ')}`);

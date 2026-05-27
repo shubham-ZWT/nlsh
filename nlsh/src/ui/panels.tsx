@@ -65,15 +65,26 @@ export function CommandPanelView({
   risk,
   reversible,
   confidence,
+  safetyWarnings,
+  fullYesRequired,
+  dryRun,
 }: {
   command: string;
   explanation: string;
   risk: string;
   reversible: boolean;
   confidence: number;
+  safetyWarnings: string[];
+  fullYesRequired: boolean;
+  dryRun: boolean;
 }) {
   return (
-    <Box borderStyle="round" borderColor="yellow" flexDirection="column" paddingX={1} paddingY={1}>
+    <Box borderStyle="round" borderColor={fullYesRequired ? 'red' : 'yellow'} flexDirection="column" paddingX={1} paddingY={1}>
+      {dryRun && (
+        <Box marginBottom={1}>
+          <Text color="yellow" bold>⚠ DRY RUN — command will not be executed</Text>
+        </Box>
+      )}
       <Box>
         <Text bold>Command: </Text>
         <Text bold color="cyan">{command}</Text>
@@ -81,6 +92,15 @@ export function CommandPanelView({
       <Box borderStyle="single" borderColor="gray" marginTop={1} paddingX={1}>
         <Text>{explanation || 'No explanation provided.'}</Text>
       </Box>
+      {safetyWarnings.length > 0 && (
+        <Box borderStyle="single" borderColor="yellow" marginTop={1} paddingX={1} flexDirection="column">
+          {safetyWarnings.map((w, i) => (
+            <Box key={i}>
+              <Text color="yellow">⚠ {w}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
       <Box marginTop={1} gap={2}>
         <Text>
           Risk: <Text color={getRiskColor(risk)} bold>{risk?.toUpperCase() || 'UNKNOWN'}</Text>
@@ -93,7 +113,11 @@ export function CommandPanelView({
         </Text>
       </Box>
       <Box marginTop={1}>
-        <Text color="cyan">  [Y] Run   [n] Skip   [e] Edit</Text>
+        {fullYesRequired ? (
+          <Text color="red">  Type "yes" to confirm   [n] Abort</Text>
+        ) : (
+          <Text color="cyan">  [Y] Run   [n] Skip   [e] Edit</Text>
+        )}
       </Box>
     </Box>
   );

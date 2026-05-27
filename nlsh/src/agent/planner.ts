@@ -27,6 +27,8 @@ Return ONLY valid JSON. No explanation. No markdown.
 
 const COMMAND_SYSTEM_PROMPT = `You are a shell agent. Generate the exact shell command for the current step. Use the history of completed steps and project terrain to inform your decision.
 
+IMPORTANT: If the step involves a "git commit", do NOT include a commit message (-m "..."). Just use bare "git commit" — the system will auto-generate a meaningful message based on the diff.
+
 Return ONLY valid JSON:
 {
   "command": "...",

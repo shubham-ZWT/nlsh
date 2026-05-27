@@ -19,6 +19,13 @@ function App({ controller }: { controller: TuiController }) {
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') return;
+
+    // When fullYesRequired, route all input through controller's buffer
+    if (state.fullYesRequired) {
+      controller.handleInput(input);
+      return;
+    }
+
     if (state.phase === 'approving' || state.phase === 'recovering') {
       if (input === 'y' || input === 'Y') controller.handleInput('y');
       else if (input === 'n' || input === 'N') controller.handleInput('n');
@@ -67,6 +74,9 @@ function RunningView({
           risk={state.currentCommand.risk}
           reversible={state.currentCommand.reversible}
           confidence={state.currentCommand.confidence}
+          safetyWarnings={state.safetyWarnings}
+          fullYesRequired={state.fullYesRequired}
+          dryRun={state.dryRun}
         />
       </Box>
     );

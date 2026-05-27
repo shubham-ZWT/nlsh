@@ -4,6 +4,9 @@ import { createPlan, generateCommand } from './planner.js';
 import { executeCommand } from './executor.js';
 import { createTask, updateTask, saveTask } from './memory.js';
 import { analyzeFailure } from './recovery.js';
+import { checkSafety } from './safety.js';
+import { isCommitCommand, captureDiff, generateCommitMessage, injectCommitMessage } from './committer.js';
+import { addEntry } from '../history/index.js';
 import type { TerrainProfile } from '../terrain/index.js';
 import type { Task, Step, StepRecord } from './memory.js';
 import type { TuiController } from '../ui/index.js';
@@ -18,6 +21,7 @@ export async function runAgent(
 ): Promise<Task> {
   const task = createTask(intent, context);
   if (terrain) task.terrain = terrain as unknown as Record<string, unknown>;
+  const dryRun = controller.state.dryRun;
 
   // --- Plan ---
   controller.update({ phase: 'planning' });
@@ -76,6 +80,35 @@ export async function runAgent(
       break;
     }
 
+    // --- Commit message generation for git commit steps ---
+    if (isCommitCommand(cmd.command)) {
+      const diff = await captureDiff();
+      if (diff) {
+        try {
+          const commitMsg = await generateCommitMessage(diff, task, config);
+          cmd.command = injectCommitMessage(cmd.command, commitMsg);
+          cmd.explanation += `\nCommit message: ${commitMsg}`;
+        } catch {
+          // LLM call failed, proceed with original command
+        }
+      }
+    }
+
+    // --- Safety check ---
+    const safety = checkSafety(cmd.command, cmd.risk, cmd.reversible, cmd.confidence);
+    if (safety.blocked) {
+      controller.updateStep(step.id, { status: 'failed', command: cmd.command });
+      controller.update({
+        phase: 'failed',
+        error: `Command blocked: ${safety.blockReason}`,
+        safetyWarnings: [],
+        fullYesRequired: false,
+      });
+      task.status = 'failed';
+      saveTask(task);
+      break;
+    }
+
     controller.updateStep(step.id, {
       command: cmd.command,
       explanation: cmd.explanation,
@@ -86,10 +119,13 @@ export async function runAgent(
     controller.update({
       phase: 'running',
       currentCommand: cmd,
+      safetyWarnings: safety.warnings,
+      fullYesRequired: safety.fullYesRequired,
     });
 
     // Await command confirmation
     const cmdInput = await controller.waitForInput();
+    controller.update({ fullYesRequired: false });
 
     if (cmdInput === 'n') {
       controller.updateStep(step.id, { status: 'skipped' });
@@ -120,13 +156,28 @@ export async function runAgent(
       }
     }
 
-    // Execute
+    // Execute (or skip in dry run)
     controller.clearOutput();
     controller.updateStep(step.id, { status: 'executing' });
 
-    const result = await executeCommand(cmd.command, {
-      onData: (chunk) => controller.appendOutput(chunk),
-    });
+    let result;
+    if (dryRun) {
+      // Simulate a successful dry-run result
+      controller.appendOutput('[DRY RUN — not executed]\n');
+      result = {
+        stdout: '[DRY RUN — not executed]\n',
+        stderr: '',
+        all: '[DRY RUN — not executed]\n',
+        exitCode: 0,
+        failed: false,
+        timedOut: false,
+        duration: Date.now(),
+      };
+    } else {
+      result = await executeCommand(cmd.command, {
+        onData: (chunk) => controller.appendOutput(chunk),
+      });
+    }
 
     const record: StepRecord = {
       stepId: step.id,
@@ -142,6 +193,16 @@ export async function runAgent(
 
     updateTask(task, record);
     saveTask(task);
+
+    // Log to user history
+    addEntry({
+      timestamp: new Date().toISOString(),
+      originalIntent: intent,
+      command: cmd.command,
+      exitCode: result.exitCode,
+      risk: cmd.risk,
+      duration: result.duration,
+    });
 
     if (result.exitCode === 0) {
       controller.updateStep(step.id, { status: 'completed', output: result.stdout });
