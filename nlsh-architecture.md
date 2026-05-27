@@ -1,4 +1,4 @@
-# nlsh — Technical Architecture
+# nlsh: Agentic Shell for Developers
 
 ## What It Is
 

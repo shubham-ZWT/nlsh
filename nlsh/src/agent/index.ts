@@ -125,9 +125,18 @@ export async function runAgent(
 
     // Await command confirmation
     const cmdInput = await controller.waitForInput();
+    const wasFullYes = controller.state.fullYesRequired;
     controller.update({ fullYesRequired: false });
 
     if (cmdInput === 'n') {
+      if (wasFullYes) {
+        // User aborted a high-risk/irreversible command — stop everything
+        controller.updateStep(step.id, { status: 'failed' });
+        controller.update({ phase: 'failed', error: 'Execution aborted by user' });
+        task.status = 'failed';
+        saveTask(task);
+        break;
+      }
       controller.updateStep(step.id, { status: 'skipped' });
       const record: StepRecord = {
         stepId: step.id,
